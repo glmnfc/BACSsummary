@@ -35,7 +35,7 @@ class block_bacssummary extends block_base {
      *
      * @return array Information about contests and tasks.
      */
-    public function get_statistics() {
+    private function get_statistics() {
         global $USER, $DB;
 
         $stats = [];
@@ -101,7 +101,6 @@ class block_bacssummary extends block_base {
         $this->content = new stdClass();
         $this->content->footer = '';
 
-
         $statistics = $this->get_statistics();
 
         $css = "
@@ -126,25 +125,7 @@ class block_bacssummary extends block_base {
                     padding-left: 15px;
                 }
                 .task-list li {
-                    position: relative;
-                    padding-left: 25px;
                     margin: 5px 0;
-                }
-                .task-list li::before {
-                    content: '•';
-                    position: absolute;
-                    left: 0;
-                    color: #27ae60;
-                }
-                .task-solved::before {
-                    content: '✓';
-                    color: #27ae60;
-                    font-weight: bold;
-                }
-                .task-failed::before {
-                    content: '✗';
-                    color: #c0392b;
-                    font-weight: bold;
                 }
                 .contest-summary {
                     margin: 10px 0;
@@ -158,60 +139,73 @@ class block_bacssummary extends block_base {
                     border-radius: 3px;
                     margin-left: 10px;
                 }
-                .percent-low {background: #ffe6e6; color: #c0392b; }
-                .percent-medium {background: #fff3e0; color: #f39c12; }
-                .percent-high {background: #e6f5e6; color: #27ae60; }
+                .percent-low { background: #ffe6e6; color: #c0392b; }
+                .percent-medium { background: #fff3e0; color: #f39c12; }
+                .percent-high { background: #e6f5e6; color: #27ae60; }
             </style>
         ";
 
         if (!empty($this->config->text)) {
             $this->content->text = $this->config->text;
-        } else {
-            $text = $css . '<div class="block-bacssummary">';
-
-            if (empty($statistics)) {
-                $text .= '<p>Нет данных о пройденных контестах</p>';
-            } else {
-                $text .= '<h3>Статистика контестов</h3>';
-
-                foreach ($statistics as $contest) {
-                    $total = $contest['total_tasks'];
-                    $solved = $contest['solved_tasks'];
-                    $percent = $total > 0 ? round(($solved / $total) * 100, 1) : 0;
-
-                    $percentClass = 'percent-low';
-                    if ($percent >= 80) {
-                        $percentClass = 'percent-high';
-                    } elseif ($percent >= 50) {
-                        $percentClass = 'percent-medium';
-                    }
-
-                    $text .= '<div class="contest-section">';
-
-                    $text .= '<div class="contest-header">';
-                    $text .= '<div class="contest-title">Контест №' . $contest['contest_id'] . ': ' . $contest['contest_name'] . '</div>';
-                    $text .= '</div>';
-
-                    $text .= '<div class="contest-summary">';
-                    $text .= "Решено задач: {$solved}/{$total} (<span class=\"percent {$percentClass}\">{$percent}%</span>)";
-                    $text .= '</div>';
-
-                    $text .= '<ul class="task-list">';
-                    foreach ($contest['tasks'] as $task) {
-                        $taskText = $task['solved']
-                            ? "Задача \"{$task['task_name']}\" — решена"
-                            : "Задача \"{$task['task_name']}\" — не решена";
-                        $text .= '<li class="' . ($task['solved'] ? 'task-solved' : 'task-failed') . '">' . $taskText . '</li>';
-                    }
-                    $text .= '</ul>';
-
-                    $text .= '</div>';
-                }
-            }
-
-            $text .= '</div>';
-            $this->content->text = $text;
+            return $this->content;
         }
+
+        $text = $css . '<div class="block-bacssummary">';
+
+        if (empty($statistics)) {
+            $text .= '<p>Нет данных о пройденных контестах</p>';
+        } else {
+            $text .= '<h3>Статистика контестов</h3>';
+
+            foreach ($statistics as $contest) {
+                $total = $contest['total_tasks'];
+                $solved = $contest['solved_tasks'];
+                $percent = $total > 0 ? ($solved / $total) * 100 : 0;
+                $percentFormatted = number_format($percent, 1, '.', '');
+                $percentFormatted = trim($percentFormatted);
+                $percentFormatted = str_replace(' ', '', $percentFormatted);
+
+                if (substr($percentFormatted, -2) === '.0') {
+                    $percentFormatted = substr($percentFormatted, 0, -2);
+                }
+
+                $percentClass = 'percent-low';
+                if ($percent >= 80) {
+                    $percentClass = 'percent-high';
+                } elseif ($percent >= 50) {
+                    $percentClass = 'percent-medium';
+                }
+
+                $text .= '<div class="contest-section">';
+
+                $text .= '<div class="contest-header">';
+                $text .= '<div class="contest-title">Контест №' . $contest['contest_id'] . ': ' . htmlspecialchars($contest['contest_name']) . '</div>';
+                $text .= '</div>';
+
+                $text .= '<div class="contest-summary">';
+                $text .= "Решено задач: {$solved}/{$total} (<span class=\"percent {$percentClass}\">{$percentFormatted}%</span>)";
+                $text .= '</div>';
+
+                $text .= '<ul class="task-list">';
+                foreach ($contest['tasks'] as $task) {
+                    if ($task['solved']) {
+                        $icon = '<span style="color: #27ae60; font-weight: bold;">&#10003;</span>';
+                        $taskText = "Задача \"{$task['task_name']}\" — решена";
+                    } else {
+                        $icon = '<span style="color: #c0392b; font-weight: bold;">&#10007;</span>';
+                        $taskText = "Задача \"{$task['task_name']}\" — не решена";
+                    }
+
+                    $text .= "<li>{$icon} {$taskText}</li>";
+                }
+                $text .= '</ul>';
+
+                $text .= '</div>';
+            }
+        }
+
+        $text .= '</div>';
+        $this->content->text = $text;
 
         return $this->content;
     }
